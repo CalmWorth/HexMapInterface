@@ -20,7 +20,6 @@ class HexGroupDefiner:
             "olive", "coral", "navy", "grey", "white", "black", "violet", "indigo", "gold"
         ]
 
-
         # Load map image
         self.load_image()
 
@@ -29,7 +28,9 @@ class HexGroupDefiner:
 
         # Bind click events
         self.canvas.bind("<Button-1>", self.on_click)
+        self.canvas.bind("<B1-Motion>", self.on_left_drag)
         self.canvas.bind("<Button-3>", self.on_right_click)
+        self.canvas.bind("<B3-Motion>", self.on_right_drag)
 
         # Add buttons
         self.add_buttons()
@@ -78,7 +79,7 @@ class HexGroupDefiner:
             x = x_center + self.hex_size * math.cos(angle_rad)
             y = y_center + self.hex_size * math.sin(angle_rad)
             points.append((x, y))
-        hexagon = self.canvas.create_polygon(points, outline='black', fill='', tags=("hexagon", f"hex_{col}_{row}"))
+        hexagon = self.canvas.create_polygon(points, outline='grey', fill='', tags=("hexagon", f"hex_{col}_{row}"))
         self.hexagons.append((hexagon, col, row))
 
     def draw_hex_grid(self):
@@ -113,13 +114,24 @@ class HexGroupDefiner:
                 print(f"Added hexagon ({col}, {row}) to {self.current_group}")
                 return
 
-    def on_right_click(self, event):
-        print('Right Clicked')
+    def on_left_drag(self, event):
+        if self.current_group is None:
+            return
         x, y = event.x, event.y
         clicked_item = self.canvas.find_closest(x, y)[0]
         tags = self.canvas.gettags(clicked_item)
-        print("Tags:", tags)
+        for tag in tags:
+            if tag.startswith("hex_"):
+                _, col, row = tag.split("_")
+                col, row = int(col), int(row)
+                self.add_to_group(col, row)
+                self.canvas.itemconfig(clicked_item, fill=self.group_colors[self.current_group])
+                print(f"Added hexagon ({col}, {row}) to {self.current_group}")
 
+    def on_right_click(self, event):
+        x, y = event.x, event.y
+        clicked_item = self.canvas.find_closest(x, y)[0]
+        tags = self.canvas.gettags(clicked_item)
         if len(tags) > 1:
             hex_tag = tags[1]
             group_tag = None
@@ -140,10 +152,25 @@ class HexGroupDefiner:
                     self.canvas.itemconfig(clicked_item, fill='')  # Reset fill color
                 else:
                     print(f"Hexagon ({col}, {row}) not found in {group_tag}")
+
             else:
                 print("No group tag found for the clicked item.")
         else:
             print("No tags found for the clicked item.")
+
+    def on_right_drag(self, event):
+        if self.current_group is None:
+            return
+        x, y = event.x, event.y
+        clicked_item = self.canvas.find_closest(x, y)[0]
+        tags = self.canvas.gettags(clicked_item)
+        for tag in tags:
+            if tag.startswith("hex_"):
+                _, col, row = tag.split("_")
+                col, row = int(col), int(row)
+                self.remove_from_group(col, row)
+                self.canvas.itemconfig(clicked_item, fill='')  # Reset fill color
+                print(f"Removed hexagon ({col}, {row}) from {self.current_group}")
 
     def add_to_group(self, col, row):
         if self.current_group not in self.groups:
@@ -151,8 +178,14 @@ class HexGroupDefiner:
         if (col, row) not in self.groups[self.current_group]:
             self.groups[self.current_group].append((col, row))
 
+    def remove_from_group(self, col, row):
+        if self.current_group in self.groups:
+            if (col, row) in self.groups[self.current_group]:
+                self.groups[self.current_group].remove((col, row))
+
 if __name__ == "__main__":
     root = tk.Tk()
-    hex_size = 20  # Size of each hexagon
+    hex_size = 5  # Size of each hexagon
     app = HexGroupDefiner(root, hex_size)
     root.mainloop()
+
