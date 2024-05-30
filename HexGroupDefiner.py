@@ -7,8 +7,20 @@ import random
 class HexGroupDefiner:
     def __init__(self, root, hex_size):
         self.root = root
-        self.canvas = tk.Canvas(root, width=800, height=600, bg='white')
-        self.canvas.pack()
+        self.frame = tk.Frame(root)
+        self.frame.pack(fill=tk.BOTH, expand=True)
+
+        self.canvas = tk.Canvas(self.frame, bg='white')
+        self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        self.v_scrollbar = tk.Scrollbar(self.frame, orient=tk.VERTICAL, command=self.canvas.yview)
+        self.v_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.h_scrollbar = tk.Scrollbar(self.root, orient=tk.HORIZONTAL, command=self.canvas.xview)
+        self.h_scrollbar.pack(side=tk.BOTTOM, fill=tk.X)
+
+        self.canvas.configure(yscrollcommand=self.v_scrollbar.set, xscrollcommand=self.h_scrollbar.set)
+
         self.hex_size = hex_size
         self.hexagons = []
         self.groups = {}
@@ -16,16 +28,13 @@ class HexGroupDefiner:
         self.current_group = None
         self.color_index = 0
         self.colors = [
-            "red", "green", "blue", "yellow", "orange", "purple", "cyan", "magenta", 
+            "red", "green", "blue", "yellow", "orange", "purple", "cyan", "magenta",
             "lime", "pink", "teal", "lavender", "brown", "beige", "maroon", "mint",
             "olive", "coral", "navy", "grey", "white", "black", "violet", "indigo", "gold"
         ]
 
         # Load map image
         self.load_image()
-
-        # Draw hexagonal grid
-        self.draw_hex_grid()
 
         # Bind click events
         self.canvas.bind("<Button-1>", self.on_click)
@@ -38,7 +47,7 @@ class HexGroupDefiner:
 
     def add_buttons(self):
         self.button_frame = tk.Frame(self.root)
-        self.button_frame.pack()
+        self.button_frame.pack(side=tk.BOTTOM, fill=tk.X)
 
         self.new_group_button = tk.Button(self.button_frame, text="New Group", command=self.new_group)
         self.new_group_button.pack(side=tk.LEFT)
@@ -50,9 +59,13 @@ class HexGroupDefiner:
         image_path = filedialog.askopenfilename()
         if image_path:
             self.image_path = image_path
-            image = tk.PhotoImage(file=image_path)
-            self.canvas.create_image(0, 0, anchor=tk.NW, image=image)
-            self.canvas.image = image
+            self.image = tk.PhotoImage(file=image_path)
+            self.canvas.create_image(0, 0, anchor=tk.NW, image=self.image)
+            self.canvas.image = self.image
+            self.canvas.config(scrollregion=self.canvas.bbox(tk.ALL))
+
+            # Draw hexagonal grid after loading image to get correct dimensions
+            self.draw_hex_grid()
 
     def new_group(self):
         group_name = simpledialog.askstring("Group Name", "Enter the name for the new group:")
@@ -65,10 +78,10 @@ class HexGroupDefiner:
         self.current_group_name = group_name
         self.color_window = Toplevel(self.root)
         self.color_window.title("Choose Group Color")
-        
+
         choose_color_button = tk.Button(self.color_window, text="Choose Color", command=self.choose_color)
         choose_color_button.pack(pady=10)
-        
+
         random_color_button = tk.Button(self.color_window, text="Random Color", command=self.choose_random_color)
         random_color_button.pack(pady=10)
 
@@ -108,8 +121,8 @@ class HexGroupDefiner:
         self.hexagons.append((hexagon, col, row))
 
     def draw_hex_grid(self):
-        width = self.canvas.winfo_reqwidth()
-        height = self.canvas.winfo_reqheight()
+        width = self.image.width()  # Use image dimensions instead of canvas dimensions
+        height = self.image.height()
         hex_height = self.hex_size * 2
         hex_width = math.sqrt(3) * self.hex_size
         vert_spacing = hex_height * 3/4
@@ -143,7 +156,7 @@ class HexGroupDefiner:
         self.handle_right_click(event.x, event.y)
 
     def handle_click(self, x, y):
-        clicked_item = self.canvas.find_closest(x, y)[0]
+        clicked_item = self.canvas.find_closest(self.canvas.canvasx(x), self.canvas.canvasy(y))[0]
         tags = self.canvas.gettags(clicked_item)
         for tag in tags:
             if tag.startswith("hex_"):
@@ -155,7 +168,7 @@ class HexGroupDefiner:
                 return
 
     def handle_right_click(self, x, y):
-        clicked_item = self.canvas.find_closest(x, y)[0]
+        clicked_item = self.canvas.find_closest(self.canvas.canvasx(x), self.canvas.canvasy(y))[0]
         tags = self.canvas.gettags(clicked_item)
         for tag in tags:
             if tag.startswith("hex_"):
