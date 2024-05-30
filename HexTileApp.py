@@ -27,6 +27,7 @@ class HexTileApp:
                 data = json.load(f)
                 self.image_path = data["image_path"]
                 self.groups = data["groups"]
+                self.group_colors = data.get("group_colors", {})
             print(f"Groups loaded from {file_path}")
             self.load_image()
 
@@ -37,6 +38,17 @@ class HexTileApp:
             self.canvas.create_image(0, 0, anchor=tk.NW, image=self.image)
             self.draw_hex_grid()
 
+    # def draw_hex(self, x_center, y_center, tag):
+    #     points = []
+    #     for i in range(6):
+    #         angle_deg = 60 * i - 30
+    #         angle_rad = math.radians(angle_deg)
+    #         x = x_center + self.hex_size * math.cos(angle_rad)
+    #         y = y_center + self.hex_size * math.sin(angle_rad)
+    #         points.append((x, y))
+    #     hexagon = self.canvas.create_polygon(points, outline='black', fill='', tags=("hexagon", tag))
+    #     self.hexagons.append((hexagon, x_center, y_center, tag))
+
     def draw_hex(self, x_center, y_center, tag):
         points = []
         for i in range(6):
@@ -45,8 +57,9 @@ class HexTileApp:
             x = x_center + self.hex_size * math.cos(angle_rad)
             y = y_center + self.hex_size * math.sin(angle_rad)
             points.append((x, y))
-        hexagon = self.canvas.create_polygon(points, outline='black', fill='', tags=("hexagon", tag))
+        hexagon = self.canvas.create_polygon(points, fill='', tags=("hexagon", tag))
         self.hexagons.append((hexagon, x_center, y_center, tag))
+
 
     def draw_hex_grid(self):
         width = self.canvas.winfo_reqwidth()
@@ -73,12 +86,25 @@ class HexTileApp:
                     return tag
         return None
 
+    def get_group_color(self, group):
+        return self.group_colors.get(group, "lightblue")
 
-    # def on_click(self, event):
-    #     x, y = event.x, event.y
-    #     clicked_item = self.canvas.find_closest(x, y)[0]
-    #     tags = self.canvas.gettags(clicked_item)
-    #     print("Clicked Item Tags:", tags)
+
+    def add_transparency(self, color, alpha):
+        """
+        Add transparency to a color in the format '#RRGGBB' or '#RRGGBBAA'.
+        """
+        if color.startswith('#'):
+            # If color is in the format '#RRGGBB', add alpha channel
+            color = color.lstrip('#')
+            rgb = tuple(int(color[i:i+2], 16) for i in (0, 2, 4))
+            return f'#{rgb[0]:02X}{rgb[1]:02X}{rgb[2]:02X}{int(alpha * 255):02X}'
+        elif color.startswith('#') and len(color) == 8:
+            # If color is already in the format '#RRGGBBAA', update alpha channel
+            return color[:7] + f'{int(alpha * 255):02X}'
+        else:
+            raise ValueError("Invalid color format. Please use '#RRGGBB' or '#RRGGBBAA'.")
+
 
 
     def on_click(self, event):
@@ -87,12 +113,16 @@ class HexTileApp:
         tags = self.canvas.gettags(clicked_item)
         if len(tags) > 1:
             group_tag = tags[1]
+            group_color = self.get_group_color(group_tag)
             for item in self.canvas.find_withtag("hexagon"):
                 item_tags = self.canvas.gettags(item)
                 if group_tag in item_tags:
-                    self.canvas.itemconfig(item, fill="lightblue")
+                    self.canvas.itemconfig(item, fill=group_color)
+                elif "hexagon" in item_tags:
+                    self.canvas.itemconfig(item, fill="")
         else:
             print("No group tag found for the clicked item.")
+
 
 
 
