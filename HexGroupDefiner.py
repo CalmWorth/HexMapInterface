@@ -1,7 +1,8 @@
 import tkinter as tk
-from tkinter import simpledialog, filedialog
+from tkinter import simpledialog, filedialog, colorchooser, Toplevel
 import math
 import json
+import random
 
 class HexGroupDefiner:
     def __init__(self, root, hex_size):
@@ -28,9 +29,9 @@ class HexGroupDefiner:
 
         # Bind click events
         self.canvas.bind("<Button-1>", self.on_click)
-        self.canvas.bind("<B1-Motion>", self.on_left_drag)
+        self.canvas.bind("<B1-Motion>", self.on_drag_left)
         self.canvas.bind("<Button-3>", self.on_right_click)
-        self.canvas.bind("<B3-Motion>", self.on_right_drag)
+        self.canvas.bind("<B3-Motion>", self.on_drag_right)
 
         # Add buttons
         self.add_buttons()
@@ -56,13 +57,37 @@ class HexGroupDefiner:
     def new_group(self):
         group_name = simpledialog.askstring("Group Name", "Enter the name for the new group:")
         if group_name and group_name not in self.groups:
-            self.groups[group_name] = []
-            self.group_colors[group_name] = self.colors[self.color_index % len(self.colors)]
-            self.color_index += 1
-            self.current_group = group_name
-            print(f"Created new group: {group_name} with color {self.group_colors[group_name]}")
+            self.group_creation_window(group_name)
         elif group_name in self.groups:
             print(f"Group {group_name} already exists. Please choose another name.")
+
+    def group_creation_window(self, group_name):
+        self.current_group_name = group_name
+        self.color_window = Toplevel(self.root)
+        self.color_window.title("Choose Group Color")
+        
+        choose_color_button = tk.Button(self.color_window, text="Choose Color", command=self.choose_color)
+        choose_color_button.pack(pady=10)
+        
+        random_color_button = tk.Button(self.color_window, text="Random Color", command=self.choose_random_color)
+        random_color_button.pack(pady=10)
+
+    def choose_color(self):
+        color = colorchooser.askcolor(title="Choose color")
+        if color[1]:
+            self.finalize_group_creation(color[1])
+
+    def choose_random_color(self):
+        color = random.choice(self.colors)
+        self.finalize_group_creation(color)
+
+    def finalize_group_creation(self, color):
+        group_name = self.current_group_name
+        self.groups[group_name] = []
+        self.group_colors[group_name] = color
+        self.current_group = group_name
+        self.color_window.destroy()
+        print(f"Created new group: {group_name} with color {color}")
 
     def save_groups(self):
         file_path = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON files", "*.json")])
@@ -79,7 +104,7 @@ class HexGroupDefiner:
             x = x_center + self.hex_size * math.cos(angle_rad)
             y = y_center + self.hex_size * math.sin(angle_rad)
             points.append((x, y))
-        hexagon = self.canvas.create_polygon(points, outline='grey', fill='', tags=("hexagon", f"hex_{col}_{row}"))
+        hexagon = self.canvas.create_polygon(points, outline='', fill='', tags=("hexagon", f"hex_{col}_{row}"))
         self.hexagons.append((hexagon, col, row))
 
     def draw_hex_grid(self):
@@ -102,7 +127,22 @@ class HexGroupDefiner:
             print("No group selected. Please create a new group first.")
             return
 
-        x, y = event.x, event.y
+        self.handle_click(event.x, event.y)
+
+    def on_drag_left(self, event):
+        if self.current_group is None:
+            print("No group selected. Please create a new group first.")
+            return
+
+        self.handle_click(event.x, event.y)
+
+    def on_right_click(self, event):
+        self.handle_right_click(event.x, event.y)
+
+    def on_drag_right(self, event):
+        self.handle_right_click(event.x, event.y)
+
+    def handle_click(self, x, y):
         clicked_item = self.canvas.find_closest(x, y)[0]
         tags = self.canvas.gettags(clicked_item)
         for tag in tags:
@@ -114,54 +154,7 @@ class HexGroupDefiner:
                 print(f"Added hexagon ({col}, {row}) to {self.current_group}")
                 return
 
-    def on_left_drag(self, event):
-        if self.current_group is None:
-            return
-        x, y = event.x, event.y
-        clicked_item = self.canvas.find_closest(x, y)[0]
-        tags = self.canvas.gettags(clicked_item)
-        for tag in tags:
-            if tag.startswith("hex_"):
-                _, col, row = tag.split("_")
-                col, row = int(col), int(row)
-                self.add_to_group(col, row)
-                self.canvas.itemconfig(clicked_item, fill=self.group_colors[self.current_group])
-                print(f"Added hexagon ({col}, {row}) to {self.current_group}")
-
-    def on_right_click(self, event):
-        x, y = event.x, event.y
-        clicked_item = self.canvas.find_closest(x, y)[0]
-        tags = self.canvas.gettags(clicked_item)
-        if len(tags) > 1:
-            hex_tag = tags[1]
-            group_tag = None
-
-            # Find which group this hex belongs to
-            for group, hexes in self.groups.items():
-                if any(hex_tag == f"hex_{col}_{row}" for col, row in hexes):
-                    group_tag = group
-                    break
-
-            if group_tag:
-                col, row = map(int, hex_tag.split("_")[1:])
-                print(f"Right-clicked Hexagon: ({col}, {row}) in {group_tag}")
-
-                if (col, row) in self.groups[group_tag]:
-                    self.groups[group_tag].remove((col, row))
-                    print(f"Hexagon ({col}, {row}) deselected from {group_tag}")
-                    self.canvas.itemconfig(clicked_item, fill='')  # Reset fill color
-                else:
-                    print(f"Hexagon ({col}, {row}) not found in {group_tag}")
-
-            else:
-                print("No group tag found for the clicked item.")
-        else:
-            print("No tags found for the clicked item.")
-
-    def on_right_drag(self, event):
-        if self.current_group is None:
-            return
-        x, y = event.x, event.y
+    def handle_right_click(self, x, y):
         clicked_item = self.canvas.find_closest(x, y)[0]
         tags = self.canvas.gettags(clicked_item)
         for tag in tags:
@@ -169,8 +162,9 @@ class HexGroupDefiner:
                 _, col, row = tag.split("_")
                 col, row = int(col), int(row)
                 self.remove_from_group(col, row)
-                self.canvas.itemconfig(clicked_item, fill='')  # Reset fill color
-                print(f"Removed hexagon ({col}, {row}) from {self.current_group}")
+                self.canvas.itemconfig(clicked_item, fill='')
+                print(f"Removed hexagon ({col}, {row}) from its group")
+                return
 
     def add_to_group(self, col, row):
         if self.current_group not in self.groups:
@@ -179,13 +173,13 @@ class HexGroupDefiner:
             self.groups[self.current_group].append((col, row))
 
     def remove_from_group(self, col, row):
-        if self.current_group in self.groups:
-            if (col, row) in self.groups[self.current_group]:
-                self.groups[self.current_group].remove((col, row))
+        for group, hexes in self.groups.items():
+            if (col, row) in hexes:
+                hexes.remove((col, row))
+                break
 
 if __name__ == "__main__":
     root = tk.Tk()
-    hex_size = 5  # Size of each hexagon
+    hex_size = 20  # Size of each hexagon
     app = HexGroupDefiner(root, hex_size)
     root.mainloop()
-
