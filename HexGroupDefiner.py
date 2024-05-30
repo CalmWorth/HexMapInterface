@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import simpledialog, filedialog
 import math
 import json
 
@@ -11,7 +11,15 @@ class HexGroupDefiner:
         self.hex_size = hex_size
         self.hexagons = []
         self.groups = {}
+        self.group_colors = {}
         self.current_group = None
+        self.color_index = 0
+        self.colors = [
+            "red", "green", "blue", "yellow", "orange", "purple", "cyan", "magenta", 
+            "lime", "pink", "teal", "lavender", "brown", "beige", "maroon", "mint",
+            "olive", "coral", "navy", "grey", "white", "black", "violet", "indigo", "gold"
+        ]
+
 
         # Load map image
         self.load_image()
@@ -19,10 +27,9 @@ class HexGroupDefiner:
         # Draw hexagonal grid
         self.draw_hex_grid()
 
-        # Bind click event
+        # Bind click events
         self.canvas.bind("<Button-1>", self.on_click)
         self.canvas.bind("<Button-3>", self.on_right_click)
-
 
         # Add buttons
         self.add_buttons()
@@ -46,17 +53,21 @@ class HexGroupDefiner:
             self.canvas.image = image
 
     def new_group(self):
-        group_name = tk.simpledialog.askstring("New Group", "Enter group name:")
-        if group_name:
+        group_name = simpledialog.askstring("Group Name", "Enter the name for the new group:")
+        if group_name and group_name not in self.groups:
             self.groups[group_name] = []
+            self.group_colors[group_name] = self.colors[self.color_index % len(self.colors)]
+            self.color_index += 1
             self.current_group = group_name
-            print(f"Created new group: {group_name}")
+            print(f"Created new group: {group_name} with color {self.group_colors[group_name]}")
+        elif group_name in self.groups:
+            print(f"Group {group_name} already exists. Please choose another name.")
 
     def save_groups(self):
         file_path = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON files", "*.json")])
         if file_path:
             with open(file_path, 'w') as f:
-                json.dump({"image_path": self.image_path, "groups": self.groups}, f)
+                json.dump({"image_path": self.image_path, "groups": self.groups, "group_colors": self.group_colors}, f)
             print(f"Groups saved to {file_path}")
 
     def draw_hex(self, x_center, y_center, col, row):
@@ -98,31 +109,9 @@ class HexGroupDefiner:
                 _, col, row = tag.split("_")
                 col, row = int(col), int(row)
                 self.add_to_group(col, row)
-                self.canvas.itemconfig(clicked_item, fill="lightblue")
+                self.canvas.itemconfig(clicked_item, fill=self.group_colors[self.current_group])
                 print(f"Added hexagon ({col}, {row}) to {self.current_group}")
                 return
-
-    def add_to_group(self, col, row):
-        if self.current_group not in self.groups:
-            self.groups[self.current_group] = []
-        if (col, row) not in self.groups[self.current_group]:
-            self.groups[self.current_group].append((col, row))
-
-    # def on_right_click(self, event):
-    #     print('Right Clicked')
-    #     x, y = event.x, event.y
-    #     clicked_item = self.canvas.find_closest(x, y)[0]
-    #     tags = self.canvas.gettags(clicked_item)
-    #     if len(tags) > 1:
-    #         group_tag = tags[1]
-    #         if group_tag in self.groups:
-    #             col, row = map(int, tags[2].split("_")[1:])
-    #             if (col, row) in self.groups[group_tag]:
-    #                 self.groups[group_tag].remove((col, row))
-    #                 print(f"Hexagon ({col}, {row}) deselected from {group_tag}")
-    #                 self.canvas.itemconfig(clicked_item, fill='')  # Reset fill color
-    #     else:
-    #         print("No group tag found for the clicked item.")
 
     def on_right_click(self, event):
         print('Right Clicked')
@@ -130,21 +119,21 @@ class HexGroupDefiner:
         clicked_item = self.canvas.find_closest(x, y)[0]
         tags = self.canvas.gettags(clicked_item)
         print("Tags:", tags)
-        
+
         if len(tags) > 1:
             hex_tag = tags[1]
             group_tag = None
-            
+
             # Find which group this hex belongs to
             for group, hexes in self.groups.items():
                 if any(hex_tag == f"hex_{col}_{row}" for col, row in hexes):
                     group_tag = group
                     break
-            
+
             if group_tag:
                 col, row = map(int, hex_tag.split("_")[1:])
                 print(f"Right-clicked Hexagon: ({col}, {row}) in {group_tag}")
-                
+
                 if (col, row) in self.groups[group_tag]:
                     self.groups[group_tag].remove((col, row))
                     print(f"Hexagon ({col}, {row}) deselected from {group_tag}")
@@ -156,10 +145,11 @@ class HexGroupDefiner:
         else:
             print("No tags found for the clicked item.")
 
-
-
-
-
+    def add_to_group(self, col, row):
+        if self.current_group not in self.groups:
+            self.groups[self.current_group] = []
+        if (col, row) not in self.groups[self.current_group]:
+            self.groups[self.current_group].append((col, row))
 
 if __name__ == "__main__":
     root = tk.Tk()
